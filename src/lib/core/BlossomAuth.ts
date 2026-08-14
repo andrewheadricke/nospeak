@@ -44,3 +44,34 @@ export async function buildBlossomUploadAuthHeader(params: {
 
     return `Nostr ${token}`;
 }
+
+export async function buildBlossomGetAuthHeader(params: {
+  sha256: string;
+  content?: string;
+  expirationSeconds?: number;
+}): Promise<string | null> {
+  const s = get(signer);
+  if (!s) {
+      return null;
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  const expiration = now + (params.expirationSeconds ?? DEFAULT_EXPIRATION_SECONDS);
+
+  const event: Partial<NostrEvent> = {
+      kind: BLOSSOM_AUTH_KIND,
+      created_at: now,
+      tags: [
+          ['t', 'get'],
+          ['x', params.sha256],
+          ['expiration', String(expiration)]
+      ],
+      content: params.content ?? 'Get blob'
+  };
+
+  const signed = await s.signEvent(event);
+  const json = JSON.stringify(signed);
+  const token = toBase64(json);
+
+  return `Nostr ${token}`;
+}

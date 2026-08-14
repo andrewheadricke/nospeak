@@ -1,5 +1,6 @@
 <script lang="ts">
     import { getIdenticonDataUri } from '$lib/core/identicon';
+    import { buildBlossomGetAuthHeader } from '$lib/core/BlossomAuth';
 
     let { src, npub, size = 'md', class: className = '', style = '' } = $props<{ 
         src?: string, 
@@ -30,6 +31,36 @@
         xl: 'w-24 h-24',
         '2xl': 'w-32 h-32'
     };
+
+    let authTried = false;
+    function handleImgError(e: error, npub: string) {
+        console.log("image load error", e, npub);
+        imgError = true
+        if (!authTried) {
+          tryAuthDownload()
+        }
+    }
+
+    async function tryAuthDownload() {
+      authTried = true;
+      let destUrl = URL.parse(src)
+      let sha256 = destUrl.pathname.substring(1)
+      if (sha256.length != 64) {
+        console.log("invalid blossom hash")
+        return
+      }
+      const token = await buildBlossomGetAuthHeader({sha256: sha256})
+      const response = await fetch(src, {
+        method: 'GET',
+        headers: {
+          'Authorization': token
+        }
+      });
+      const imageBlob = await response.blob();
+      const objectURL = URL.createObjectURL(imageBlob);
+      src = objectURL;
+      imgError = false;
+    }
 </script>
 
 <div class={`${sizeClasses[size as keyof typeof sizeClasses]} ${className} rounded-full ring-2 ring-white/50 dark:ring-white/10 overflow-hidden flex-shrink-0 bg-gray-200 dark:bg-slate-700 shadow-sm`} style={style}>
@@ -37,6 +68,6 @@
         src={finalSrc} 
         alt="Avatar" 
         class="w-full h-full object-cover"
-        onerror={() => imgError = true}
+        onerror={(e) => handleImgError(e, npub)}
     />
 </div>
